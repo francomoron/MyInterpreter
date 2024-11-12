@@ -60,10 +60,10 @@ int main(int argc, char *argv[]) {
 
         if (strlen(file_contents) > 0) {
             instruction_interpreter(file_contents);
-            exit(1);
-        } 
-        
+        }
+
         free(file_contents);
+
     } else {
         fprintf(stderr, "Unknown command: %s\n", command);
         return 1;
@@ -112,7 +112,7 @@ Token* scanToken(char character, int line, int position) {
     token->lexeme = malloc(2);
     token->lexeme[0] = character;
     token->lexeme[1] = '\0';
-
+    
     token->line = line;
 
     switch (character) {
@@ -149,22 +149,22 @@ char* tokenTypeToString(TokenType tokenType) {
 
 void instruction_interpreter(const char* file_contents){
     int position = 0;
-    int len = strlen(file_contents + 1);
-    int line = 0;
+    int len = strlen(file_contents);
+    int line = 1;
 
     Token* myToken;
 
-    while (position <= len) {
+    while (position < len) {
         if( file_contents[position] == '\n'){
             line++;
         }else{
             myToken = scanToken(file_contents[position], line, position);
             char* myTokenStringType =  tokenTypeToString(myToken->type);
-            fprintf(stderr, "%s  %s null\n", myTokenStringType, myToken->lexeme);
+            fprintf(stderr, "%s %s null\n", myTokenStringType, myToken->lexeme);
             free(myToken->lexeme);
         }
         position++;
     }
-    fprintf(stderr,"EOF null\n");
+    fprintf(stderr,"EOF  null\n");
 }
 
