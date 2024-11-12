@@ -180,6 +180,15 @@ Token* scanToken(char* filecontent, int line, int* position) {
         token->type = match(filecontent, position, '=') ? GREATER_EQUAL : GREATER;
         if (token->type == GREATER_EQUAL) token->lexeme[1] = '=', token->lexeme[2] = '\0';
         break;
+        case ' ':
+      case '\r':
+      case '\t':
+        // Ignore whitespace.
+        break;
+
+      case '\n':
+        (*position)++;
+        break;
       default:
         token->error = 1; break;
     }
