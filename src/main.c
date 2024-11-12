@@ -32,6 +32,7 @@ typedef struct {
     void *literal;
     int line;
     bool error;
+    bool comment;
 } Token;
 
 // ---------------
@@ -151,6 +152,16 @@ Token* scanToken(char* filecontent, int line, int* position) {
       case '-': token->type = MINUS; break;
       case '+': token->type = PLUS; break;
       case ';': token->type = SEMICOLON; break;
+      case '/':
+        if (match(filecontent, position, '/')) {
+            token->comment = 1;
+            while (filecontent[*position] != '\n' && filecontent[*position] != '\0') {
+                character = advance(filecontent, position);
+            }
+        } else {
+            token->type = SLASH;
+        }
+      break;
       case '*': token->type = STAR; break;
       // One or two character tokens.
       case '!':
@@ -187,6 +198,7 @@ char* tokenTypeToString(TokenType tokenType) {
       case MINUS: return "MINUS";
       case PLUS: return "PLUS";
       case SEMICOLON: return "SEMICOLON";
+      case SLASH: return "SLASH";
       case STAR: return "STAR";
       // One or two character tokens.
       case BANG: return "BANG";
@@ -218,7 +230,9 @@ void instruction_interpreter(char* file_contents){
             position++;
         }else{
             myToken = scanToken(file_contents, line, &position);
-
+            if(myToken->comment){
+                continue;
+            }
             if(!(myToken->error)){
                 char* myTokenStringType =  tokenTypeToString(myToken->type);
                 validTokens = realloc(validTokens, sizeof(Token*) * (tokenCount + 1));
