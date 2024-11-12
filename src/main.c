@@ -162,11 +162,11 @@ Token* scanToken(char* filecontent, int line, int* position) {
         if (token->type == EQUAL_EQUAL) token->lexeme[1] = '=', token->lexeme[2] = '\0';
         break;
       case '<':
-        token->type = match(filecontent, position, '<') ? LESS_EQUAL : LESS;
+        token->type = match(filecontent, position, '=') ? LESS_EQUAL : LESS;
         if (token->type == LESS_EQUAL) token->lexeme[1] = '=', token->lexeme[2] = '\0';
         break;
       case '>':
-        token->type = match(filecontent, position, '>') ? GREATER_EQUAL : GREATER;
+        token->type = match(filecontent, position, '=') ? GREATER_EQUAL : GREATER;
         if (token->type == GREATER_EQUAL) token->lexeme[1] = '=', token->lexeme[2] = '\0';
         break;
       default:
