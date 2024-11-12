@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 
 // ---------------
 // STRUCTURES
@@ -32,15 +31,19 @@ typedef struct {
     char *lexeme;
     void *literal;
     int line;
+    bool error;
 } Token;
 
 // ---------------
 // FUNCTIONS
 // ---------------
-char *read_file_contents(const char *filename);
-Token* scanToken(char character, int line, int position);
-void instruction_interpreter(const char* file_contents);
+char *read_file_contents(char *filename);
+char advance(char* filecontent, int* position);
+bool isAtEnd(int position, int len);
+Token* scanToken(char* filecontent, int line, int* position);
+void instruction_interpreter(char* file_contents);
 char* tokenTypeToString(TokenType tokenType);
+int match(char *filecontent, int* position, char expectedCharacter);
 
 int main(int argc, char *argv[]) {
     // Disable output buffering
@@ -74,7 +77,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-char *read_file_contents(const char *filename) {
+char *read_file_contents(char *filename) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
         fprintf(stderr, "Error reading file: %s\n", filename);
@@ -106,8 +109,27 @@ char *read_file_contents(const char *filename) {
     return file_contents;
 }
 
-Token* scanToken(char character, int line, int position) {
+char advance(char* filecontent, int* position) {
+    char myChar = filecontent[*position];
+    (*position)++;
+    return myChar;
+}
+
+bool isAtEnd(int position, int len){
+ return position >= len;
+}
+
+int match(char *filecontent, int* position, char expectedCharacter){
+    if(isAtEnd(*position, strlen(filecontent)) || filecontent[*position] != expectedCharacter){
+        return 0;
+    }
+    (*position)++;
+    return 1;
+}
+
+Token* scanToken(char* filecontent, int line, int* position) {
     Token* token = malloc(sizeof(Token));
+    char character = advance(filecontent, position);
 
     token->literal = NULL;
 
@@ -116,8 +138,10 @@ Token* scanToken(char character, int line, int position) {
     token->lexeme[1] = '\0';
     
     token->line = line;
+    token->error = 0;
 
     switch (character) {
+       // Single-character tokens.
       case '(': token->type = LEFT_PAREN; break;
       case ')': token->type = RIGHT_PAREN; break;
       case '{': token->type = LEFT_BRACE; break;
@@ -128,13 +152,24 @@ Token* scanToken(char character, int line, int position) {
       case '+': token->type = PLUS; break;
       case ';': token->type = SEMICOLON; break;
       case '*': token->type = STAR; break;
+      // One or two character tokens.
+      case '!':
+        token->type = match(filecontent, position, '=') ? BANG_EQUAL : BANG; break;
+      case '=':
+        token->type = match(filecontent, position, '=') ? EQUAL_EQUAL : EQUAL; break;
+      case '<':
+        token->type = match(filecontent, position, '<') ? LESS_EQUAL : LESS; break;
+      case '>':
+        token->type = match(filecontent, position, '>') ? GREATER_EQUAL : GREATER; break;
+      default:
+        token->error = 1; break;
     }
-
     return token;
 }
 
 char* tokenTypeToString(TokenType tokenType) {
     switch (tokenType) {
+      // Single-character tokens.
       case LEFT_PAREN: return "LEFT_PAREN";
       case RIGHT_PAREN: return "RIGHT_PAREN";
       case LEFT_BRACE: return "LEFT_BRACE";
@@ -145,28 +180,60 @@ char* tokenTypeToString(TokenType tokenType) {
       case PLUS: return "PLUS";
       case SEMICOLON: return "SEMICOLON";
       case STAR: return "STAR";
-      default: return "UNKNOWN";
+      // One or two character tokens.
+      case BANG: return "BANG";
+      case BANG_EQUAL: return "BANG_EQUAL" ;
+      case EQUAL: return "EQUAL";
+      case EQUAL_EQUAL: return "EQUAL_EQUAL";
+      case GREATER:  return "GREATER";
+      case GREATER_EQUAL: return "GREATER_EQUAL";
+      case LESS: return "LESS";
+      case LESS_EQUAL: return "LESS_EQUAL";
+      default: return "Unexpected character";
     }
 }
 
-void instruction_interpreter(const char* file_contents){
+void instruction_interpreter(char* file_contents){
     int position = 0;
     int len = strlen(file_contents);
     int line = 1;
 
+    int error = 0;
     Token* myToken;
 
-    while (position < len) {
+    Token** validTokens = NULL;
+    int tokenCount = 0;
+
+    while (!isAtEnd(position, len)) {
         if( file_contents[position] == '\n'){
             line++;
+            position++;
         }else{
-            myToken = scanToken(file_contents[position], line, position);
-            char* myTokenStringType =  tokenTypeToString(myToken->type);
-            printf("%s %s null\n", myTokenStringType, myToken->lexeme);
-            free(myToken->lexeme);
+            myToken = scanToken(file_contents, line, &position);
+
+            if(!(myToken->error)){
+                char* myTokenStringType =  tokenTypeToString(myToken->type);
+                validTokens = realloc(validTokens, sizeof(Token*) * (tokenCount + 1));
+                validTokens[tokenCount] = myToken;
+                tokenCount++;
+            }else{
+                error = 1;
+                fprintf(stderr, "[line %d] Error: Unexpected character: %s\n", line, myToken->lexeme);
+                free(myToken->lexeme);
+            }
         }
-        position++;
     }
-   printf("EOF  null\n");
+    for (int i = 0; i < tokenCount; i++) {
+        char* myTokenStringType = tokenTypeToString(validTokens[i]->type);
+        printf("%s %s null\n", myTokenStringType, validTokens[i]->lexeme);
+        free(validTokens[i]->lexeme);
+        free(validTokens[i]);
+    }
+    printf("EOF  null\n");
+    if(!(error)){
+        exit(0);
+    }else{
+        exit(65);
+    }
 }
 
