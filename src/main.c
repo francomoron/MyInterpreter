@@ -181,9 +181,10 @@ Token* scanToken(char* filecontent, int line, int* position) {
         if (token->type == GREATER_EQUAL) token->lexeme[1] = '=', token->lexeme[2] = '\0';
         break;
         case ' ':
-      case '\r':
-      case '\t':
+        case '\r':
+        case '\t':
         // Ignore whitespace.
+            token->comment = 1;
         break;
 
       case '\n':
