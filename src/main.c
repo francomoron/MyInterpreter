@@ -60,8 +60,10 @@ int main(int argc, char *argv[]) {
 
         if (strlen(file_contents) > 0) {
             instruction_interpreter(file_contents);
+        }else{
+            printf("EOF  null\n");
+            exit(0);
         }
-
         free(file_contents);
 
     } else {
@@ -160,11 +162,11 @@ void instruction_interpreter(const char* file_contents){
         }else{
             myToken = scanToken(file_contents[position], line, position);
             char* myTokenStringType =  tokenTypeToString(myToken->type);
-            fprintf(stderr, "%s %s null\n", myTokenStringType, myToken->lexeme);
+            printf("%s %s null\n", myTokenStringType, myToken->lexeme);
             free(myToken->lexeme);
         }
         position++;
     }
-    fprintf(stderr,"EOF  null\n");
+   printf("EOF  null\n");
 }
 
