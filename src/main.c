@@ -154,13 +154,21 @@ Token* scanToken(char* filecontent, int line, int* position) {
       case '*': token->type = STAR; break;
       // One or two character tokens.
       case '!':
-        token->type = match(filecontent, position, '=') ? BANG_EQUAL : BANG; break;
+        token->type = match(filecontent, position, '=') ? BANG_EQUAL : BANG; 
+        if (token->type == BANG_EQUAL) token->lexeme[1] = '=', token->lexeme[2] = '\0';
+        break;
       case '=':
-        token->type = match(filecontent, position, '=') ? EQUAL_EQUAL : EQUAL; break;
+        token->type = match(filecontent, position, '=') ? EQUAL_EQUAL : EQUAL;
+        if (token->type == EQUAL_EQUAL) token->lexeme[1] = '=', token->lexeme[2] = '\0';
+        break;
       case '<':
-        token->type = match(filecontent, position, '<') ? LESS_EQUAL : LESS; break;
+        token->type = match(filecontent, position, '<') ? LESS_EQUAL : LESS;
+        if (token->type == LESS_EQUAL) token->lexeme[1] = '=', token->lexeme[2] = '\0';
+        break;
       case '>':
-        token->type = match(filecontent, position, '>') ? GREATER_EQUAL : GREATER; break;
+        token->type = match(filecontent, position, '>') ? GREATER_EQUAL : GREATER;
+        if (token->type == GREATER_EQUAL) token->lexeme[1] = '=', token->lexeme[2] = '\0';
+        break;
       default:
         token->error = 1; break;
     }
