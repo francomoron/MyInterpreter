@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 // ---------------
 // STRUCTURES
@@ -40,8 +41,9 @@ typedef struct {
 // ---------------
 char *read_file_contents(char *filename);
 char advance(char* filecontent, int* position);
-bool isAtEnd(int position, int len);
+int isAtEnd(int position, int len);
 Token* scanToken(char* filecontent, int line, int* position);
+int decimals_to_show(char* str);
 void instruction_interpreter(char* file_contents);
 char* tokenTypeToString(TokenType tokenType);
 int match(char *filecontent, int* position, char expectedCharacter);
@@ -116,7 +118,7 @@ char advance(char* filecontent, int* position) {
     return myChar;
 }
 
-bool isAtEnd(int position, int len){
+int isAtEnd(int position, int len){
  return position >= len;
 }
 
@@ -134,6 +136,7 @@ Token* scanToken(char* filecontent, int line, int* position) {
 
     token->literal = NULL;
     token->comment = 0;
+    token->error = 0;
 
     token->lexeme = malloc(2);
     token->lexeme[0] = character;
@@ -141,7 +144,6 @@ Token* scanToken(char* filecontent, int line, int* position) {
     
     token->line = line;
     token->literal = NULL;
-    token->error = 0;
 
     switch (character) {
        // Single-character tokens.
@@ -187,7 +189,7 @@ Token* scanToken(char* filecontent, int line, int* position) {
       case '"': {
                     token->type = STRING;
                     int len = strlen(token->lexeme);
-
+                    
                     while(!isAtEnd(*position, strlen(filecontent)) && filecontent[*position] != '"'){
                         character = advance(filecontent, position);
                         token->lexeme = (char*)realloc(token->lexeme, len + 1 + 1);
@@ -219,10 +221,32 @@ Token* scanToken(char* filecontent, int line, int* position) {
                     }
                     break;
                 }
-        default:
-            token->error = 1; break;
-        }
-        return token;
+      case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': {
+            token->type = NUMBER;
+            int len = strlen(token->lexeme);
+
+            int isDecimal = 0;
+
+            while (!isAtEnd(*position, strlen(filecontent)) && ( (filecontent[*position] >= '0' && filecontent[*position] <= '9') ||  filecontent[*position] == '.' ) ) {
+                character = advance(filecontent, position);
+                if(character == '.'){
+                    isDecimal = 1;
+                }
+                token->lexeme = (char*)realloc(token->lexeme, len + 1 + 1);
+                token->lexeme[len] = character;
+                len++;
+                token->lexeme[len] = '\0';
+            }
+            
+            double myNumber = strtod(token->lexeme, NULL);
+            token->literal = malloc(sizeof(double));
+            *((double*) (token->literal)) = myNumber;
+            
+            break;
+      }
+      default: token->error = 1; break;
+    }
+    return token;
 }
 
 char* tokenTypeToString(TokenType tokenType) {
@@ -249,8 +273,34 @@ char* tokenTypeToString(TokenType tokenType) {
       case LESS: return "LESS";
       case LESS_EQUAL: return "LESS_EQUAL";
       case STRING: return "STRING";
+      case NUMBER: return "NUMBER";
       default: return "Unexpected character";
     }
+}
+// 11111.0001221200
+int decimals_to_show(char* str){
+    int len = strlen(str);
+    int response = 0;
+    int countDigit = 0;
+    int isCero = 0;
+
+    for(int i=0; i<len; i++){
+        if(str[i] == '0' && countDigit){
+            isCero++;
+        }
+        if(str[i] != '0' && countDigit){
+            response = response + 1 + isCero;
+            isCero = 0;
+        }
+        if(str[i] == '.'){
+            countDigit = 1;
+        }
+    }
+    if(!countDigit || isCero){
+        response = 1;
+    }
+    
+    return response;
 }
 
 void instruction_interpreter(char* file_contents){
@@ -296,6 +346,9 @@ void instruction_interpreter(char* file_contents){
         }else{
             if(validTokens[i]->type == STRING){
                 printf("%s %s %s\n", myTokenStringType, validTokens[i]->lexeme, ((char*) (validTokens[i]->literal)));
+            }
+            if(validTokens[i]->type == NUMBER){
+                printf("%s %s %.*f\n", myTokenStringType, validTokens[i]->lexeme, decimals_to_show(validTokens[i]->lexeme) , *((double*) (validTokens[i]->literal)) );
             }
         }
         free(validTokens[i]->lexeme);
