@@ -31,7 +31,7 @@ typedef struct {
     char *lexeme;
     void *literal;
     int line;
-    bool error;
+    int error;
     bool comment;
 } Token;
 
@@ -133,12 +133,14 @@ Token* scanToken(char* filecontent, int line, int* position) {
     char character = advance(filecontent, position);
 
     token->literal = NULL;
+    token->comment = 0;
 
     token->lexeme = malloc(2);
     token->lexeme[0] = character;
     token->lexeme[1] = '\0';
     
     token->line = line;
+    token->literal = NULL;
     token->error = 0;
 
     switch (character) {
@@ -180,20 +182,47 @@ Token* scanToken(char* filecontent, int line, int* position) {
         token->type = match(filecontent, position, '=') ? GREATER_EQUAL : GREATER;
         if (token->type == GREATER_EQUAL) token->lexeme[1] = '=', token->lexeme[2] = '\0';
         break;
-        case ' ':
-        case '\r':
-        case '\t':
-        // Ignore whitespace.
-            token->comment = 1;
-        break;
+      case ' ': case '\r': case '\t': token->comment = 1; break;
+      case '\n': (*position)++; break;
+      case '"': {
+                    token->type = STRING;
+                    int len = strlen(token->lexeme);
 
-      case '\n':
-        (*position)++;
-        break;
-      default:
-        token->error = 1; break;
-    }
-    return token;
+                    while(!isAtEnd(*position, strlen(filecontent)) && filecontent[*position] != '"'){
+                        character = advance(filecontent, position);
+                        token->lexeme = (char*)realloc(token->lexeme, len + 1 + 1);
+                        token->lexeme[len] = character;
+                        len++;
+                        token->lexeme[len] = '\0';
+                    }
+
+                    if(filecontent[*position] == '\0'){
+                        token->error = 2;
+                        break;
+                    }
+
+                    if(filecontent[*position] == '"'){
+                        character = advance(filecontent, position);
+                        token->lexeme = (char*)realloc(token->lexeme, len + 1);
+                        token->lexeme[len] = character;
+                        len++;
+                        token->lexeme[len] = '\0';
+                    }
+
+                    token->literal = malloc( (sizeof(char) * len) - (sizeof(char) * 2) );
+                    for(int i=0; i <= (len - 2); i++ ){
+                        if(i == len - 2){
+                            ((char*) (token->literal)) [i] = '\0';
+                            continue;
+                        }
+                        ((char*) (token->literal)) [i] = token->lexeme[i+1];
+                    }
+                    break;
+                }
+        default:
+            token->error = 1; break;
+        }
+        return token;
 }
 
 char* tokenTypeToString(TokenType tokenType) {
@@ -219,6 +248,7 @@ char* tokenTypeToString(TokenType tokenType) {
       case GREATER_EQUAL: return "GREATER_EQUAL";
       case LESS: return "LESS";
       case LESS_EQUAL: return "LESS_EQUAL";
+      case STRING: return "STRING";
       default: return "Unexpected character";
     }
 }
@@ -244,21 +274,32 @@ void instruction_interpreter(char* file_contents){
                 continue;
             }
             if(!(myToken->error)){
-                char* myTokenStringType =  tokenTypeToString(myToken->type);
                 validTokens = realloc(validTokens, sizeof(Token*) * (tokenCount + 1));
                 validTokens[tokenCount] = myToken;
                 tokenCount++;
             }else{
                 error = 1;
-                fprintf(stderr, "[line %d] Error: Unexpected character: %s\n", line, myToken->lexeme);
+                if(myToken->error == 1){
+                    fprintf(stderr, "[line %d] Error: Unexpected character: %s\n", line, myToken->lexeme);
+                }
+                if(myToken->error == 2){
+                    fprintf(stderr, "[line %d] Error: Unterminated string.\n", line);
+                }
                 free(myToken->lexeme);
             }
         }
     }
     for (int i = 0; i < tokenCount; i++) {
         char* myTokenStringType = tokenTypeToString(validTokens[i]->type);
-        printf("%s %s null\n", myTokenStringType, validTokens[i]->lexeme);
+        if(!validTokens[i]->literal){
+            printf("%s %s null\n", myTokenStringType, validTokens[i]->lexeme);
+        }else{
+            if(validTokens[i]->type == STRING){
+                printf("%s %s %s\n", myTokenStringType, validTokens[i]->lexeme, ((char*) (validTokens[i]->literal)));
+            }
+        }
         free(validTokens[i]->lexeme);
+        free(validTokens[i]->literal);
         free(validTokens[i]);
     }
     printf("EOF  null\n");
