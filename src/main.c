@@ -28,6 +28,32 @@ typedef enum {
 } TokenType;
 
 typedef struct {
+    char *keyword;
+    TokenType type;
+} Keyword;
+
+Keyword keywords[] = {
+    {"and", AND},
+    {"class", CLASS},
+    {"else", ELSE},
+    {"false", FALSE},
+    {"for", FOR},
+    {"fun", FUN},
+    {"if", IF},
+    {"nil", NIL},
+    {"or", OR},
+    {"print", PRINT},
+    {"return", RETURN},
+    {"super", SUPER},
+    {"this", THIS},
+    {"true", TRUE},
+    {"var", VAR},
+    {"while", WHILE}
+};
+
+#define NUM_KEYWORDS (sizeof(keywords) / sizeof(Keyword))
+
+typedef struct {
     TokenType type;
     char *lexeme;
     void *literal;
@@ -42,6 +68,7 @@ typedef struct {
 char *read_file_contents(char *filename);
 char advance(char* filecontent, int* position);
 int isAtEnd(int position, int len);
+TokenType checkKeyword(char *lexeme);
 Token* scanToken(char* filecontent, int line, int* position);
 int decimals_to_show(char* str);
 void instruction_interpreter(char* file_contents);
@@ -116,6 +143,15 @@ char advance(char* filecontent, int* position) {
     char myChar = filecontent[*position];
     (*position)++;
     return myChar;
+}
+
+TokenType checkKeyword(char *lexeme) {
+    for (int i = 0; i < NUM_KEYWORDS; i++) {
+        if (strcmp(lexeme, keywords[i].keyword) == 0) {
+            return keywords[i].type;
+        }
+    }
+    return IDENTIFIER;
 }
 
 int isAtEnd(int position, int len){
@@ -244,10 +280,9 @@ Token* scanToken(char* filecontent, int line, int* position) {
             
             break;
       }
-      case '_': case 'a' ... 'z': case 'A' ... 'Z':
-        token->type = IDENTIFIER;
-            token->type = IDENTIFIER;
+      case '_': case 'a' ... 'z': case 'A' ... 'Z':{
             int len = strlen(token->lexeme);
+            token->type = IDENTIFIER;
             while(!isAtEnd(*position, strlen(filecontent)) && ( (filecontent[*position] >= 'a' && filecontent[*position] <= 'z') ||
                     (filecontent[*position] >= 'A' && filecontent[*position] <= 'Z') || (filecontent[*position] == '_') ||
                     (filecontent[*position] >= '0' && filecontent[*position] <= '9') ) ){
@@ -256,10 +291,10 @@ Token* scanToken(char* filecontent, int line, int* position) {
                         token->lexeme[len] = character;
                         len++;
                         token->lexeme[len] = '\0';
+                        token->type = checkKeyword(token->lexeme);
                     }
-            //printf("MI IDENTIFICADOR: %s\n\n", token->lexeme  );
-        break;
-      
+            break;
+        }
       default: token->error = 1; break;
     }
     return token;
@@ -291,6 +326,22 @@ char* tokenTypeToString(TokenType tokenType) {
       case STRING: return "STRING";
       case NUMBER: return "NUMBER";
       case IDENTIFIER: return "IDENTIFIER";
+      case AND: return "AND";
+      case CLASS: return "CLASS";
+      case ELSE: return "ELSE"; 
+      case FALSE: return "FALSE"; 
+      case FUN: return "FUN";
+      case FOR: return "FOR";
+      case IF: return "IF"; 
+      case NIL: return "NIL";
+      case OR: return "OR";
+      case PRINT: return "PRINT";
+      case RETURN: return "RETURN";
+      case SUPER: return "SUPER";
+      case THIS: return "THIS";
+      case TRUE: return "TRUE";
+      case VAR: return "VAR";
+      case WHILE: return "WHILE";
       default: return "Unexpected character";
     }
 }
