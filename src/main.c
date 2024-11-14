@@ -221,7 +221,7 @@ Token* scanToken(char* filecontent, int line, int* position) {
                     }
                     break;
                 }
-      case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': {
+      case '0' ... '9': {
             token->type = NUMBER;
             int len = strlen(token->lexeme);
 
@@ -244,6 +244,22 @@ Token* scanToken(char* filecontent, int line, int* position) {
             
             break;
       }
+      case '_': case 'a' ... 'z': case 'A' ... 'Z':
+        token->type = IDENTIFIER;
+            token->type = IDENTIFIER;
+            int len = strlen(token->lexeme);
+            while(!isAtEnd(*position, strlen(filecontent)) && ( (filecontent[*position] >= 'a' && filecontent[*position] <= 'z') ||
+                    (filecontent[*position] >= 'A' && filecontent[*position] <= 'Z') || (filecontent[*position] == '_') ||
+                    (filecontent[*position] >= '0' && filecontent[*position] <= '9') ) ){
+                        character = advance(filecontent, position);
+                        token->lexeme = (char*)realloc(token->lexeme, len + 1 + 1);
+                        token->lexeme[len] = character;
+                        len++;
+                        token->lexeme[len] = '\0';
+                    }
+            //printf("MI IDENTIFICADOR: %s\n\n", token->lexeme  );
+        break;
+      
       default: token->error = 1; break;
     }
     return token;
@@ -274,10 +290,11 @@ char* tokenTypeToString(TokenType tokenType) {
       case LESS_EQUAL: return "LESS_EQUAL";
       case STRING: return "STRING";
       case NUMBER: return "NUMBER";
+      case IDENTIFIER: return "IDENTIFIER";
       default: return "Unexpected character";
     }
 }
-// 11111.0001221200
+
 int decimals_to_show(char* str){
     int len = strlen(str);
     int response = 0;
