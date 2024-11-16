@@ -53,3 +53,8 @@ dkms.conf
 
 build
 vcpkg_installed
+
+# Git
+.gitattributes
+.vscode
+.codecrafters

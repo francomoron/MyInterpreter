@@ -58,9 +58,21 @@ typedef struct {
     char *lexeme;
     void *literal;
     int line;
-    int error;
-    bool comment;
+    //int error;
+    //int comment;
 } Token;
+
+struct Element{
+	void* info;
+	struct Element* next;
+};
+
+typedef struct Element t_Element;
+
+typedef struct {
+	t_Element* firstelement;
+	int count;
+} t_List;
 
 // ---------------
 // FUNCTIONS
@@ -69,11 +81,17 @@ char *read_file_contents(char *filename);
 char advance(char* filecontent, int* position);
 int isAtEnd(int position, int len);
 TokenType checkKeyword(char *lexeme);
-Token* scanToken(char* filecontent, int line, int* position);
+Token* scanToken(char* filecontent, int* line, int* position, int* error, char** msgError);
 int decimals_to_show(char* str);
-void instruction_interpreter(char* file_contents);
+t_List* instruction_interpreter(char* file_contents);
 char* tokenTypeToString(TokenType tokenType);
 int match(char *filecontent, int* position, char expectedCharacter);
+t_List *listCreate();
+int listAdd(t_List* list, void* info);
+void listIterate(t_List* list, void(*myFunction)(void*));
+void listRemoveAll(t_List* list, void (*freeElement)(void*));
+void printTokens(void* element);
+void freeToken(void* token);
 
 int main(int argc, char *argv[]) {
     // Disable output buffering
@@ -92,7 +110,11 @@ int main(int argc, char *argv[]) {
         char *file_contents = read_file_contents(argv[2]);
 
         if (strlen(file_contents) > 0) {
-            instruction_interpreter(file_contents);
+
+            t_List* Tokens = instruction_interpreter(file_contents);
+            //listIterate(Tokens, &printTokens);
+            listRemoveAll(Tokens, &freeToken);
+
         }else{
             printf("EOF  null\n");
             exit(0);
@@ -166,19 +188,17 @@ int match(char *filecontent, int* position, char expectedCharacter){
     return 1;
 }
 
-Token* scanToken(char* filecontent, int line, int* position) {
+Token* scanToken(char* filecontent, int* line, int* position, int* error, char** msgError) {
+
     Token* token = malloc(sizeof(Token));
     char character = advance(filecontent, position);
-
-    token->literal = NULL;
-    token->comment = 0;
-    token->error = 0;
 
     token->lexeme = malloc(2);
     token->lexeme[0] = character;
     token->lexeme[1] = '\0';
     
-    token->line = line;
+    token->line = *line;
+
     token->literal = NULL;
 
     switch (character) {
@@ -194,10 +214,15 @@ Token* scanToken(char* filecontent, int line, int* position) {
       case ';': token->type = SEMICOLON; break;
       case '/':
         if (match(filecontent, position, '/')) {
-            token->comment = 1;
             while (filecontent[*position] != '\n' && filecontent[*position] != '\0') {
                 character = advance(filecontent, position);
             }
+            if(character == '\n'){
+                (*line)++;
+            }
+            free(token->lexeme);
+            free(token);
+            token = scanToken(filecontent, line, position, error, msgError);
         } else {
             token->type = SLASH;
         }
@@ -220,8 +245,27 @@ Token* scanToken(char* filecontent, int line, int* position) {
         token->type = match(filecontent, position, '=') ? GREATER_EQUAL : GREATER;
         if (token->type == GREATER_EQUAL) token->lexeme[1] = '=', token->lexeme[2] = '\0';
         break;
-      case ' ': case '\r': case '\t': token->comment = 1; break;
-      case '\n': (*position)++; break;
+      case ' ': case '\r': case '\t': case '\n':{
+            if(token->lexeme){free(token->lexeme);} 
+            if(token){free(token);}
+            if(character == '\n'){ (*line)++;}
+
+            while (!isAtEnd(*position, strlen(filecontent)) &&  
+                (filecontent[*position] == ' ' || filecontent[*position] == '\r' || 
+                filecontent[*position] == '\t' || filecontent[*position] == '\n')
+            ){
+                if (filecontent[*position] == '\n') { (*line)++;}
+                (*position)++;
+            }
+            token = scanToken(filecontent, line, position, error, msgError);
+            break;
+        }
+      case '\0': {
+            if(token->lexeme){free(token->lexeme);} 
+            if(token){free(token);}
+            token = NULL;
+            break;
+        }
       case '"': {
                     token->type = STRING;
                     int len = strlen(token->lexeme);
@@ -235,7 +279,14 @@ Token* scanToken(char* filecontent, int line, int* position) {
                     }
 
                     if(filecontent[*position] == '\0'){
-                        token->error = 2;
+                        *error = 1;// To do
+                        
+                        size_t length = snprintf(NULL, 0, "[line %d] Error: Unterminated string.", *line) + 1;
+                        *msgError = malloc(length);
+                        snprintf(*msgError, length, "[line %d] Error: Unterminated string.", *line);
+
+                        free(token->lexeme); free(token); position++; line++;
+                        
                         break;
                     }
 
@@ -287,7 +338,7 @@ Token* scanToken(char* filecontent, int line, int* position) {
                     (filecontent[*position] >= 'A' && filecontent[*position] <= 'Z') || (filecontent[*position] == '_') ||
                     (filecontent[*position] >= '0' && filecontent[*position] <= '9') ) ){
                         character = advance(filecontent, position);
-                        token->lexeme = (char*)realloc(token->lexeme, len + 1 + 1);
+                        token->lexeme = (char*) realloc(token->lexeme, len + 1 + 1);
                         token->lexeme[len] = character;
                         len++;
                         token->lexeme[len] = '\0';
@@ -295,7 +346,17 @@ Token* scanToken(char* filecontent, int line, int* position) {
                     }
             break;
         }
-      default: token->error = 1; break;
+      default: {
+            *error = 1;// To do
+
+            size_t length = snprintf(NULL, 0, "[line %d] Error: Unexpected character: %s", *line, token->lexeme) + 1;
+            *msgError = malloc(length);
+            snprintf(*msgError, length, "[line %d] Error: Unexpected character: %s", *line, token->lexeme);
+
+            free(token->lexeme); free(token); position++; line++;
+                        
+            break;
+      }
     }
     return token;
 }
@@ -371,63 +432,110 @@ int decimals_to_show(char* str){
     return response;
 }
 
-void instruction_interpreter(char* file_contents){
+t_List* instruction_interpreter(char* file_contents){
+
+    t_List* Tokens = listCreate();
+
     int position = 0;
     int len = strlen(file_contents);
     int line = 1;
 
-    int error = 0;
-    Token* myToken;
-
-    Token** validTokens = NULL;
-    int tokenCount = 0;
+    int error = 0; // No errors yet
+    char* errorMessage = NULL; // No error messages yet
 
     while (!isAtEnd(position, len)) {
-        if( file_contents[position] == '\n'){
-            line++;
-            position++;
-        }else{
-            myToken = scanToken(file_contents, line, &position);
-            if(myToken->comment){
-                continue;
-            }
-            if(!(myToken->error)){
-                validTokens = realloc(validTokens, sizeof(Token*) * (tokenCount + 1));
-                validTokens[tokenCount] = myToken;
-                tokenCount++;
+        
+        Token* Token = scanToken(file_contents, &line, &position, &error , &errorMessage);
+        if(!Token){break;} // Token is NULL => I'm at the EOF
+
+        if(error == 0){
+
+            listAdd(Tokens, Token);
+            if(!Token->literal){
+                printf("%s %s null \n", tokenTypeToString(Token->type), Token->lexeme);
             }else{
-                error = 1;
-                if(myToken->error == 1){
-                    fprintf(stderr, "[line %d] Error: Unexpected character: %s\n", line, myToken->lexeme);
+
+                if(Token->type == STRING){
+                    printf("%s %s %s\n", tokenTypeToString(Token->type), Token->lexeme, ((char*) (Token->literal)));
                 }
-                if(myToken->error == 2){
-                    fprintf(stderr, "[line %d] Error: Unterminated string.\n", line);
+                if(Token->type == NUMBER){
+                    printf("%s %s %.*f\n", tokenTypeToString(Token->type), Token->lexeme, decimals_to_show(Token->lexeme) , *((double*) (Token->literal)) );
                 }
-                free(myToken->lexeme);
             }
-        }
-    }
-    for (int i = 0; i < tokenCount; i++) {
-        char* myTokenStringType = tokenTypeToString(validTokens[i]->type);
-        if(!validTokens[i]->literal){
-            printf("%s %s null\n", myTokenStringType, validTokens[i]->lexeme);
         }else{
-            if(validTokens[i]->type == STRING){
-                printf("%s %s %s\n", myTokenStringType, validTokens[i]->lexeme, ((char*) (validTokens[i]->literal)));
-            }
-            if(validTokens[i]->type == NUMBER){
-                printf("%s %s %.*f\n", myTokenStringType, validTokens[i]->lexeme, decimals_to_show(validTokens[i]->lexeme) , *((double*) (validTokens[i]->literal)) );
-            }
+
+            fprintf(stderr, "%s\n", errorMessage);
+            free(errorMessage);
+            error = 0; // Error Reset
         }
-        free(validTokens[i]->lexeme);
-        free(validTokens[i]->literal);
-        free(validTokens[i]);
     }
+
+    // Create EOF Token
+    Token* EndOfFile = malloc(sizeof(Token));
+    EndOfFile->line = line; // Asegurarse de asignar la línea final
+    EndOfFile->type = EOF_TOKEN;
+    // Insert EOF Token
+    listAdd(Tokens, EndOfFile);
     printf("EOF  null\n");
-    if(!(error)){
-        exit(0);
-    }else{
-        exit(65);
-    }
+
+    return Tokens;
 }
 
+t_List *listCreate() {
+	t_List *list = malloc(sizeof(t_List));
+	list->firstelement = NULL;
+	list->count = 0;
+	return list;
+}
+
+int listAdd(t_List* list, void* info) {
+    // Element
+    t_Element* element = malloc(sizeof(t_Element));
+	element->info = info;
+    element->next = NULL;
+
+    t_Element** elementReference = &list->firstelement;
+    // Index
+    for (int i = 0; i < list->count; ++i) {
+		elementReference = &(*elementReference)->next;
+	}
+    // Insert Element
+    element->next = *elementReference;
+	*elementReference = element;
+
+	list->count++;
+    return list->count - 1;
+}
+
+void listIterate(t_List* list, void(*myFunction)(void*)) {
+	t_Element* element = list->firstelement;
+	while ( element != NULL) {
+		myFunction(element->info);
+		element = element->next;
+	}
+}
+
+void listRemoveAll(t_List* list, void (*freeElement)(void*)) {
+
+    while (list->count > 0) {
+        t_Element* element = list->firstelement;
+        list->firstelement = element->next;
+        freeElement(element->info);
+        free(element);
+	    list->count--;
+	}
+    
+    free(list);
+}
+
+void printTokens(void* element){
+    Token myToken =  *((Token*) element) ;
+    printf("Lexeme: %s\n", myToken.lexeme);
+}
+
+void freeToken(void* token){
+    Token* myToken = (Token*) token;
+    //printf("Liberando: %s\n", myToken->lexeme);
+    free(myToken->lexeme);
+    free(token);
+}
